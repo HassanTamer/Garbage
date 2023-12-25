@@ -5,6 +5,7 @@ uint8_t dataFlag;  // a flag to detect if the transmitted bytes are more more th
 
 void main() {
 }
+
 void begin(int8_t addr) {
   // Enable the I2C CLOCK and GPIO CLOCK
   RCC_APB1ENR |= (1 << 21);  // enable I2C1 CLOCK
@@ -24,6 +25,21 @@ void begin(int8_t addr) {
   setClock(45);            //if clock not set ...the default frequency is 45MHZ
   // Program the I2C_CR1 register to enable the peripheral
   I2C1_CR1 |= (1 << 0);  // Enable I2C
+   switch (addr) {
+    case -1:  //master mode
+      // master send start condition
+      I2C1_CR1 |= (1 << 10);  // Enable the ACK
+      I2C1_CR1 |= (1 << 8);   // Generate START
+      while (!(I2C1_SR1 & (1 << 0)))
+        ;  // Wait fror SB bit to set
+      break;
+
+    default:
+      I2C1_OAR1 &= ~(1 << 15);      // set the 15th bit in I2C1_OAR1 to zero for 7-bit addressing mode
+      I2C1_OAR1 = (addr << 1) | 0;  // Set the address(addr -> 8 bits) of slave in bits from 1 to 8 (since we use 7bit address mode the 8th bit is don't care)
+      break;
+  }
+ }
   void setClock(uint8_t freq) {
     if (freq < MinFreq) freq = MinFreq;
     if (freq > MaxFreq) freq = MaxFreq;
@@ -38,30 +54,14 @@ void begin(int8_t addr) {
     I2C1_TRISE = trise;
     // the calculations are for operation in standard mode not fm...
   }
+  
 
-
-  switch (addr) {
-    case -1:  //master mode
-      // master send start condition
-      I2C1_CR1 |= (1 << 10);  // Enable the ACK
-      I2C1_CR1 |= (1 << 8);   // Generate START
-      while (!(I2C1_SR1 & (1 << 0)))
-        ;  // Wait fror SB bit to set
-      break;
-
-    default:
-      I2C1_OAR1 &= ~(1 << 15);      // set the 15th bit in I2C1_OAR1 to zero for 7-bit addressing mode
-      I2C1_OAR1 = (addr << 1) | 0;  // Set the address(addr -> 8 bits) of slave in bits from 1 to 8 (since we use 7bit address mode the 8th bit is don't care)
-      break;
-  }
-}
 void requestFrom(uint8_t addr, uint8_t quantity) {
   I2C1_DR = addr;
-  while (!(I2C1_SR1 & (1 << 0)))
-    ;                                  // Wait fror ADDR bit to set (address matched)
+  while (!(I2C1_SR1 & (1 << 0)));                                  // Wait fror ADDR bit to set (address matched)
   uint8_t temp = I2C1_SR1 | I2C1_SR2;  //read SR1 and SR2 to clear ADDR bit
   if (quantity == 1) { dataFlag = 0 };
-                       else if (quantity > 1) {
+    else if (quantity > 1) {
     dataFlag = 1
   };
 }
